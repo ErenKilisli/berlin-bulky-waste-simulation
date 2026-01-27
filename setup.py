@@ -1,0 +1,37 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="berlin-waste-sim",
+    version="0.1.0",
+    description="Discrete Event Simulation of Berlin Bulky Waste Management",
+    author="BSBI MSc IT Management Team",
+    author_email="",
+    packages=find_packages(),
+    install_requires=[
+        "simpy>=4.1.1",
+        "numpy>=1.26.4",
+        "pandas>=2.2.1",
+        "scipy>=1.12.0",
+        "geojson>=3.1.0",
+        "geopandas>=0.14.3",
+        "shapely>=2.0.3",
+        "matplotlib>=3.8.3",
+        "seaborn>=0.13.2",
+        "plotly>=5.19.0",
+        "scikit-learn>=1.4.1",
+        "statsmodels>=0.14.1",
+        "tqdm>=4.66.2",
+        "python-dateutil>=2.9.0",
+        "pytz>=2024.1",
+        "pyyaml>=6.0.1",
+    ],
+    python_requires=">=3.9",
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Intended Audience :: Education",
+        "Topic :: Scientific/Engineering :: Simulation",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+    ],
+)

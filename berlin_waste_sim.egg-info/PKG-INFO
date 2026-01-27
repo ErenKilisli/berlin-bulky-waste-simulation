@@ -1,0 +1,34 @@
+Metadata-Version: 2.4
+Name: berlin-waste-sim
+Version: 0.1.0
+Summary: Discrete Event Simulation of Berlin Bulky Waste Management
+Author: BSBI MSc IT Management Team
+Author-email: 
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Education
+Classifier: Topic :: Scientific/Engineering :: Simulation
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Python: >=3.9
+Requires-Dist: simpy>=4.1.1
+Requires-Dist: numpy>=1.26.4
+Requires-Dist: pandas>=2.2.1
+Requires-Dist: scipy>=1.12.0
+Requires-Dist: geojson>=3.1.0
+Requires-Dist: geopandas>=0.14.3
+Requires-Dist: shapely>=2.0.3
+Requires-Dist: matplotlib>=3.8.3
+Requires-Dist: seaborn>=0.13.2
+Requires-Dist: plotly>=5.19.0
+Requires-Dist: scikit-learn>=1.4.1
+Requires-Dist: statsmodels>=0.14.1
+Requires-Dist: tqdm>=4.66.2
+Requires-Dist: python-dateutil>=2.9.0
+Requires-Dist: pytz>=2024.1
+Requires-Dist: pyyaml>=6.0.1
+Dynamic: author
+Dynamic: classifier
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
