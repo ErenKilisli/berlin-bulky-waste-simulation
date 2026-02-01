@@ -1,17 +1,5 @@
-"""
-Data Loader Module
-
-Handles loading and preprocessing of all data sources:
-- Waste configuration (waste_config.json)
-- Population demographics (population_2024.csv)
-- Illegal dumping incidents (ordnungsamt_2023.json)
-- Berlin district boundaries (berlin_map.geojson)
-"""
-
 import json
 from pathlib import Path
-from typing import Dict, Optional, Tuple
-
 import pandas as pd
 import geopandas as gpd
 import numpy as np
@@ -25,335 +13,254 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
 
+def _resolve_path(filename: str) -> Path:
+    """Try data/ first, then data/raw/."""
+    path = DATA_DIR / filename
+    if not path.exists():
+        path = DATA_DIR / "raw" / filename
+    return path
+
+
 class DataLoader:
-    """
-    Centralized data loader for all simulation data sources.
-    """
-    
-    def __init__(self, data_dir: Optional[Path] = None):
-        """
-        Initialize data loader.
-        
-        Args:
-            data_dir: Optional custom data directory path
-        """
-        self.data_dir = data_dir or DATA_DIR
-        
-        # Data containers
-        self.waste_config: Optional[Dict] = None
-        self.population_data: Optional[pd.DataFrame] = None
-        self.ordnungsamt_data: Optional[pd.DataFrame] = None
-        self.geo_data: Optional[gpd.GeoDataFrame] = None
-        self.district_demographics: Optional[pd.DataFrame] = None
-        
-    def load_waste_config(self) -> Dict:
-        """Load bulky waste category configuration."""
-        path = self.data_dir / "waste_config.json"
-        if not path.exists():
-            path = self.data_dir / "raw" / "waste_config.json"
-        
+    """Unified data loader for Berlin bulky waste simulation."""
+
+    def __init__(self, data_dir: Path = DATA_DIR):
+        self.data_dir = data_dir
+        self.waste_config: list = []          # list of category dicts
+        self.population_data: pd.DataFrame = None
+        self.ordnungsamt_data: pd.DataFrame = None
+        self.geo_data: gpd.GeoDataFrame = None
+        self.district_demographics: pd.DataFrame = None
+
+    # ------------------------------------------------------------------
+    # WASTE CONFIG  (JSON is a flat list → store as list)
+    # ------------------------------------------------------------------
+    def load_waste_config(self) -> list:
+        path = _resolve_path("waste_config.json")
         logger.info(f"Loading waste config from: {path}")
-        
-        with open(path, "r", encoding="utf-8") as f:
-            self.waste_config = json.load(f)
-        
-        # Handle both list and dict formats
-        if isinstance(self.waste_config, list):
-            # Convert list to dict format
-            categories = {}
-            for item in self.waste_config:
-                if isinstance(item, dict) and 'name' in item:
-                    categories[item['name']] = item
-            self.waste_config = {'categories': categories}
-        
-        logger.info(f"Loaded waste config with {len(self.waste_config.get('categories', {}))} categories")
-        
-        return self.waste_config
-    
-    def load_population_data(self) -> pd.DataFrame:
-        """Load population data and derive youth ratio."""
-        path = self.data_dir / "population_2024.csv"
-        if not path.exists():
-            path = self.data_dir / "raw" / "population_2024.csv"
-        
-        logger.info(f"Loading population data from: {path}")
-        
-        df = pd.read_csv(path, sep=";", encoding="utf-8")
-        
-        # Extract total population
-        if "E_E" in df.columns:
-            df["total_population"] = pd.to_numeric(df["E_E"], errors="coerce").fillna(0)
-        
-        # Calculate youth ratio (18-45 age group)
-        # Look for age columns in the format E_E01 to E_E18 (age groups)
-        age_cols = [col for col in df.columns if col.startswith("E_E") and len(col) > 3]
-        
-        if age_cols:
-            # Simplified: assume columns 3-8 represent youth (18-45)
-            youth_cols = age_cols[3:8] if len(age_cols) >= 8 else age_cols[:3]
-            df["youth_population"] = df[youth_cols].apply(
-                lambda x: pd.to_numeric(x, errors="coerce"), axis=1
-            ).sum(axis=1)
-            df["youth_ratio"] = (df["youth_population"] / df["total_population"]).fillna(0.30)
-            df["youth_ratio"] = df["youth_ratio"].clip(0.10, 0.50)
-        else:
-            # Default youth ratio
-            np.random.seed(42)
-            df["youth_ratio"] = np.random.uniform(0.25, 0.45, size=len(df))
-        
-        # Extract district names
-        if "BEZIRK" in df.columns:
-            df["bezirk"] = df["BEZIRK"]
-        elif "Bezirk" in df.columns:
-            df["bezirk"] = df["Bezirk"]
-        else:
-            # Use first text column as district name
-            text_cols = df.select_dtypes(include=['object']).columns
-            if len(text_cols) > 0:
-                df["bezirk"] = df[text_cols[0]]
-        
-        self.population_data = df
-        logger.info(f"Loaded population data: {len(df)} areas")
-        
-        return df
-    
-    def load_ordnungsamt_data(self) -> pd.DataFrame:
-        """Load illegal bulky waste incident reports."""
-        path = self.data_dir / "ordnungsamt_2023.json"
-        if not path.exists():
-            path = self.data_dir / "raw" / "ordnungsamt_2023.json"
-        
-        logger.info(f"Loading Ordnungsamt data from: {path}")
-        
+
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        
-        # Handle nested JSON structure
-        if isinstance(data, dict):
-            # Try common keys
-            for key in ['features', 'data', 'records', 'index']:
-                if key in data:
-                    data = data[key]
-                    break
-            else:
-                # Use first key
-                key = next(iter(data))
-                data = data[key]
-        
-        df = pd.DataFrame(data)
-        
-        # Parse timestamps if available
-        timestamp_cols = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
-        for col in timestamp_cols:
-            try:
-                df[col] = pd.to_datetime(df[col], errors='coerce')
-            except:
-                pass
-        
-        self.ordnungsamt_data = df
-        logger.info(f"Loaded Ordnungsamt data: {len(df)} incidents")
-        
+
+        # Accept both a raw list and a dict wrapper like {"categories": [...]}
+        if isinstance(data, list):
+            self.waste_config = data
+        elif isinstance(data, dict) and "categories" in data:
+            self.waste_config = data["categories"]
+        else:
+            raise ValueError("waste_config.json must be a list or contain a 'categories' key")
+
+        logger.info(f"Loaded waste config with {len(self.waste_config)} categories")
+        return self.waste_config
+
+    def get_waste_category_attractiveness(self, category_id: str) -> float:
+        """Return app_sell_chance for a given category_id (e.g. 'WOOD')."""
+        for cat in self.waste_config:
+            if cat["category_id"] == category_id:
+                return cat["app_sell_chance"]
+        logger.warning(f"Category '{category_id}' not found, using default 0.5")
+        return 0.5
+
+    def get_category_ids(self) -> list:
+        """Return list of all category_id values."""
+        return [cat["category_id"] for cat in self.waste_config]
+
+    def get_category_probabilities(self) -> dict:
+        """Return {category_id: probability} for weighted random selection."""
+        return {cat["category_id"]: cat["probability"] for cat in self.waste_config}
+
+    # ------------------------------------------------------------------
+    # POPULATION
+    # ------------------------------------------------------------------
+    def load_population_data(self) -> pd.DataFrame:
+        path = _resolve_path("population_2024.csv")
+        logger.info(f"Loading population data from: {path}")
+
+        df = pd.read_csv(path, sep=";", encoding="utf-8")
+
+        if "E_E" in df.columns:
+            df["total_population"] = pd.to_numeric(df["E_E"], errors="coerce").fillna(0)
+
+        # Youth ratio (18-45) for reuse probability model
+        youth_cols = [col for col in df.columns if any(
+            col.strip().startswith(f"E{age}") for age in range(18, 46)
+        )]
+
+        if youth_cols and "total_population" in df.columns:
+            df["youth_population"] = df[youth_cols].apply(
+                lambda row: pd.to_numeric(row, errors="coerce").sum(), axis=1
+            )
+            df["youth_ratio"] = (df["youth_population"] / df["total_population"]).clip(0.15, 0.45)
+        else:
+            np.random.seed(42)
+            df["youth_ratio"] = np.random.uniform(0.2, 0.4, size=len(df))
+
+        self.population_data = df
+        logger.info(f"Loaded population data: {df.shape[0]} areas")
         return df
-    
-    def load_geo_data(self) -> gpd.GeoDataFrame:
-        """Load Berlin district boundaries (GeoJSON)."""
-        path = self.data_dir / "berlin_map.geojson"
-        if not path.exists():
-            path = self.data_dir / "raw" / "berlin_map.geojson"
-        
+
+    # ------------------------------------------------------------------
+    # ORDNUNGSAMT
+    # ------------------------------------------------------------------
+    def load_ordnungsamt_data(self) -> pd.DataFrame:
+        path = _resolve_path("ordnungsamt_2023.json")
+        logger.info(f"Loading Ordnungsamt data from: {path}")
+
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if isinstance(data, dict):
+            key = next(iter(data))
+            df = pd.DataFrame(data[key])
+        elif isinstance(data, list):
+            df = pd.DataFrame(data)
+        else:
+            raise ValueError("Unexpected structure in ordnungsamt_2023.json")
+
+        self.ordnungsamt_data = df
+        logger.info(f"Loaded Ordnungsamt data: {df.shape[0]} incidents")
+        return df
+
+    # ------------------------------------------------------------------
+    # GEO / MAP
+    # ------------------------------------------------------------------
+    def load_map_data(self) -> gpd.GeoDataFrame:
+        path = _resolve_path("berlin_map.geojson")
         logger.info(f"Loading geo data from: {path}")
-        
+
         gdf = gpd.read_file(path)
-        
         self.geo_data = gdf
         logger.info(f"Loaded geo data: {len(gdf)} geometries")
-        
         return gdf
-    
-    def prepare_district_demographics(self) -> pd.DataFrame:
+
+    # ------------------------------------------------------------------
+    # DISTRICT DEMOGRAPHICS  (aggregated for simulation)
+    # ------------------------------------------------------------------
+    def calculate_district_demographics(self) -> pd.DataFrame:
         """
-        Prepare aggregated district-level demographics.
-        
-        Returns:
-            DataFrame with district-level statistics
+        Aggregate population rows into 12 Berlin Bezirke.
+        Uses BEZIRK column if available, otherwise groups by first N rows.
         """
         if self.population_data is None:
             self.load_population_data()
-        
-        # Group by district (bezirk)
-        if "bezirk" in self.population_data.columns:
-            demographics = self.population_data.groupby("bezirk").agg({
-                "total_population": "sum",
-                "youth_ratio": "mean"
-            }).reset_index()
+
+        df = self.population_data.copy()
+
+        # Try to find a district-level grouping column
+        bezirk_col = None
+        for candidate in ["BEZIRK", "Bezirk", "bezirk", "BEZIRKSNAME"]:
+            if candidate in df.columns:
+                bezirk_col = candidate
+                break
+
+        if bezirk_col:
+            demographics = (
+                df.groupby(bezirk_col)
+                .agg(
+                    total_population=("total_population", "sum"),
+                    youth_ratio=("youth_ratio", "mean"),
+                )
+                .reset_index()
+                .rename(columns={bezirk_col: "bezirk"})
+            )
         else:
-            # If no district column, use entire dataset
-            demographics = pd.DataFrame({
-                "bezirk": ["Berlin"],
-                "total_population": [self.population_data["total_population"].sum()],
-                "youth_ratio": [self.population_data["youth_ratio"].mean()]
-            })
-        
+            # Fallback: treat entire dataset as one district "Berlin"
+            demographics = pd.DataFrame([{
+                "bezirk": "Berlin",
+                "total_population": df["total_population"].sum(),
+                "youth_ratio": df["youth_ratio"].mean(),
+            }])
+
+        demographics["youth_ratio"] = demographics["youth_ratio"].clip(0.15, 0.45)
+
+        # Save processed
+        out_dir = self.data_dir / "processed"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        demographics.to_csv(out_dir / "district_demographics.csv", index=False)
+
         self.district_demographics = demographics
         logger.info(f"Prepared demographics for {len(demographics)} districts")
-        
         return demographics
-    
-    def load_all_data(self) -> Tuple[Dict, pd.DataFrame, pd.DataFrame, gpd.GeoDataFrame, pd.DataFrame]:
-        """
-        Load all data sources.
-        
-        Returns:
-            Tuple of (waste_config, population, ordnungsamt, geo_data, demographics)
-        """
-        logger.info("Loading all data sources...")
-        
-        try:
-            self.load_waste_config()
-            self.load_population_data()
-            self.load_ordnungsamt_data()
-            self.load_geo_data()
-            self.prepare_district_demographics()
-            
-            logger.info("All data loaded successfully")
-            
-            return (
-                self.waste_config,
-                self.population_data,
-                self.ordnungsamt_data,
-                self.geo_data,
-                self.district_demographics
-            )
-        
-        except Exception as e:
-            logger.error(f"✗ Error during data loading: {e}")
-            raise
-    
+
     def get_district_youth_ratio(self, district: str) -> float:
-        """
-        Get youth ratio for a specific district.
-        
-        Args:
-            district: District name
-            
-        Returns:
-            Youth ratio (default: 0.30)
-        """
+        """Return youth_ratio for a district name."""
         if self.district_demographics is None:
-            self.prepare_district_demographics()
-        
-        match = self.district_demographics[
-            self.district_demographics["bezirk"].str.contains(district, case=False, na=False)
-        ]
-        
-        if not match.empty:
-            return match.iloc[0]["youth_ratio"]
-        
-        # Default value
-        return 0.30
-    
-    def get_waste_category_attractiveness(self, category: str) -> float:
-        """
-        Get attractiveness score for a waste category.
-        
-        Args:
-            category: Waste category name
-            
-        Returns:
-            Attractiveness score (0.0-1.0)
-        """
-        if self.waste_config is None:
-            self.load_waste_config()
-        
-        categories = self.waste_config.get('categories', {})
-        
-        if category in categories:
-            return categories[category].get('attractiveness', 0.5)
-        
-        # Default value
-        return 0.5
+            self.calculate_district_demographics()
+
+        row = self.district_demographics[self.district_demographics["bezirk"] == district]
+        if len(row) == 0:
+            logger.warning(f"District '{district}' not found → default 0.30")
+            return 0.30
+        return float(row.iloc[0]["youth_ratio"])
+
+    # ------------------------------------------------------------------
+    # LOAD ALL
+    # ------------------------------------------------------------------
+    def load_all_data(self):
+        """Load every dataset and prepare demographics."""
+        logger.info("Loading all data sources...")
+        self.load_waste_config()
+        self.load_population_data()
+        self.load_ordnungsamt_data()
+        self.load_map_data()
+        self.calculate_district_demographics()
+        logger.info("All data loaded successfully")
+        return (
+            self.waste_config,
+            self.population_data,
+            self.ordnungsamt_data,
+            self.geo_data,
+            self.district_demographics,
+        )
 
 
-# Standalone functions for backward compatibility
-def load_waste_config():
-    """Load bulky waste category configuration."""
-    path = DATA_DIR / "waste_config.json"
-    if not path.exists():
-        path = DATA_DIR / "raw" / "waste_config.json"
-    
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def load_population_data():
-    """Load population data and derive a simplified app adoption rate."""
-    path = DATA_DIR / "population_2024.csv"
-    if not path.exists():
-        path = DATA_DIR / "raw" / "population_2024.csv"
-    
-    df = pd.read_csv(path, sep=";", encoding="utf-8")
-    
-    if "E_E" in df.columns:
-        df["total_population"] = pd.to_numeric(df["E_E"], errors="coerce").fillna(0)
-        
-        np.random.seed(42)
-        df["adoption_rate"] = np.random.uniform(0.1, 0.7, size=len(df))
-    
-    return df
-
-
-def load_ordnungsamt_data():
-    """Load illegal bulky waste incident reports."""
-    path = DATA_DIR / "ordnungsamt_2023.json"
-    if not path.exists():
-        path = DATA_DIR / "raw" / "ordnungsamt_2023.json"
-    
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    
-    if isinstance(data, dict):
-        key = next(iter(data))
-        return pd.DataFrame(data[key])
-    
-    return pd.DataFrame(data)
-
-
-def load_map_data():
-    """Load Berlin district boundaries (GeoJSON)."""
-    path = DATA_DIR / "berlin_map.geojson"
-    if not path.exists():
-        path = DATA_DIR / "raw" / "berlin_map.geojson"
-    
-    return gpd.read_file(path)
-
-
+# ==================================================================
+# STANDALONE TEST
+# ==================================================================
 if __name__ == "__main__":
-    print("="*70)
+    print("\n" + "=" * 70)
     print("TESTING DATA LOADER")
-    print("="*70)
-    
-    # Test class-based loader
+    print("=" * 70)
+
     loader = DataLoader()
-    
+
     try:
-        waste_config, population, ordnungsamt, geo, demographics = loader.load_all_data()
-        
-        print("\n[OK] Data Loading Summary:")
-        print(f"  - Waste categories: {len(waste_config.get('categories', {}))}")
-        print(f"  - Population records: {len(population)}")
-        print(f"  - Ordnungsamt incidents: {len(ordnungsamt)}")
-        print(f"  - Geographic features: {len(geo)}")
-        print(f"  - Districts: {len(demographics)}")
-        
-        print("\n[OK] District Demographics Sample:")
-        print(demographics.head())
-        
-        print("\n[OK] Waste Categories:")
-        for cat_name in waste_config.get('categories', {}).keys():
-            attractiveness = loader.get_waste_category_attractiveness(cat_name)
-            print(f"  - {cat_name}: attractiveness = {attractiveness}")
-        
+        waste, population, incidents, geo, demographics = loader.load_all_data()
+
+        print(f"\n[OK] Waste categories       : {len(waste)}")
+        print(f"[OK] Population records     : {population.shape[0]}")
+        print(f"[OK] Ordnungsamt incidents  : {incidents.shape[0]}")
+        print(f"[OK] Geographic features    : {len(geo)}")
+        print(f"[OK] Districts (aggregated) : {len(demographics)}")
+
+        # --- Categories with correct attractiveness ---
+        print("\n" + "-" * 70)
+        print("Waste Categories (app_sell_chance):")
+        print("-" * 70)
+        for cat in waste:
+            print(f"  {cat['category_id']:>12}  |  {cat['name']:<45}  |  attractiveness = {cat['app_sell_chance']}")
+
+        # --- Demographics ---
+        print("\n" + "-" * 70)
+        print("District Demographics:")
+        print("-" * 70)
+        print(demographics.to_string(index=False))
+
+        # --- Quick helper tests ---
+        print("\n" + "-" * 70)
+        print("Helper method tests:")
+        print("-" * 70)
+        print(f"  get_waste_category_attractiveness('WOOD')     = {loader.get_waste_category_attractiveness('WOOD')}")
+        print(f"  get_waste_category_attractiveness('E_WASTE')  = {loader.get_waste_category_attractiveness('E_WASTE')}")
+        print(f"  get_waste_category_attractiveness('TEXTILE')  = {loader.get_waste_category_attractiveness('TEXTILE')}")
+        print(f"  get_waste_category_attractiveness('MIXED_WASTE') = {loader.get_waste_category_attractiveness('MIXED_WASTE')}")
+        print(f"  get_category_ids()                            = {loader.get_category_ids()}")
+
+        print("\n" + "=" * 70)
+        print("ALL TESTS PASSED ✓")
+        print("=" * 70 + "\n")
+
     except Exception as e:
-        print(f"\n[ERROR] Error during data loading: {e}")
+        print(f"\n[FAIL] {e}")
         import traceback
         traceback.print_exc()

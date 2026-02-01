@@ -1,7 +1,7 @@
 [
     {
         "category_id": "WOOD",
-        "name": "Ahşap Mobilya (Dolap, Masa, Sandalye)",
+        "name": "Wood Furniture (Wardrobe, Table, Chair)",
         "bsr_source": "Abfallbilanz 2023 - Altholz",
         "probability": 0.45,
         "avg_weight_kg": 40.0,
@@ -11,7 +11,7 @@
     },
     {
         "category_id": "E_WASTE",
-        "name": "Elektronik (TV, Monitör, Beyaz Eşya)",
+        "name": "Electronics (TV, Monitor, Home Appliances)",
         "bsr_source": "Abfallbilanz 2023 - Elektrogeräte",
         "probability": 0.05,
         "avg_weight_kg": 15.0,
@@ -21,7 +21,7 @@
     },
     {
         "category_id": "TEXTILE",
-        "name": "Halı / Yatak / Tekstil",
+        "name": "Carpet / Mattress / Textile",
         "bsr_source": "Abfallbilanz 2023 - Teppiche/Matratzen",
         "probability": 0.1,
         "avg_weight_kg": 25.0,
@@ -31,7 +31,7 @@
     },
     {
         "category_id": "MIXED_WASTE",
-        "name": "Karışık / Kırık / Tanımsız",
+        "name": "Mixed / Broken / Unidentified",
         "bsr_source": "Abfallbilanz 2023 - Sonstiges",
         "probability": 0.4,
         "avg_weight_kg": 10.0,
