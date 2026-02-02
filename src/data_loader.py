@@ -26,14 +26,14 @@ class DataLoader:
 
     def __init__(self, data_dir: Path = DATA_DIR):
         self.data_dir = data_dir
-        self.waste_config: list = []          # list of category dicts
+        self.waste_config: list = []
         self.population_data: pd.DataFrame = None
         self.ordnungsamt_data: pd.DataFrame = None
         self.geo_data: gpd.GeoDataFrame = None
         self.district_demographics: pd.DataFrame = None
 
     # ------------------------------------------------------------------
-    # WASTE CONFIG  (JSON is a flat list → store as list)
+    # WASTE CONFIG
     # ------------------------------------------------------------------
     def load_waste_config(self) -> list:
         path = _resolve_path("waste_config.json")
@@ -42,7 +42,6 @@ class DataLoader:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # Accept both a raw list and a dict wrapper like {"categories": [...]}
         if isinstance(data, list):
             self.waste_config = data
         elif isinstance(data, dict) and "categories" in data:
@@ -54,7 +53,7 @@ class DataLoader:
         return self.waste_config
 
     def get_waste_category_attractiveness(self, category_id: str) -> float:
-        """Return app_sell_chance for a given category_id (e.g. 'WOOD')."""
+        """Return app_sell_chance for a given category_id."""
         for cat in self.waste_config:
             if cat["category_id"] == category_id:
                 return cat["app_sell_chance"]
@@ -82,9 +81,12 @@ class DataLoader:
             df["total_population"] = pd.to_numeric(df["E_E"], errors="coerce").fillna(0)
 
         # Youth ratio (18-45) for reuse probability model
-        youth_cols = [col for col in df.columns if any(
-            col.strip().startswith(f"E{age}") for age in range(18, 46)
-        )]
+        youth_cols = []
+        for age in range(18, 46):
+            for col in df.columns:
+                if f"E{age}" in col or f"E_E{age}" in col:
+                    youth_cols.append(col)
+                    break
 
         if youth_cols and "total_population" in df.columns:
             df["youth_population"] = df[youth_cols].apply(
@@ -92,8 +94,16 @@ class DataLoader:
             )
             df["youth_ratio"] = (df["youth_population"] / df["total_population"]).clip(0.15, 0.45)
         else:
-            np.random.seed(42)
-            df["youth_ratio"] = np.random.uniform(0.2, 0.4, size=len(df))
+            # Fallback: use age group columns E_E18U25, E_E25U55
+            age_group_cols = [c for c in df.columns if any(x in c for x in ["E_E18U25", "E_E25U55"])]
+            if age_group_cols:
+                df["youth_population"] = df[age_group_cols].apply(
+                    lambda row: pd.to_numeric(row, errors="coerce").sum(), axis=1
+                )
+                df["youth_ratio"] = (df["youth_population"] / df["total_population"]).clip(0.15, 0.45)
+            else:
+                np.random.seed(42)
+                df["youth_ratio"] = np.random.uniform(0.2, 0.4, size=len(df))
 
         self.population_data = df
         logger.info(f"Loaded population data: {df.shape[0]} areas")
@@ -109,11 +119,19 @@ class DataLoader:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        if isinstance(data, dict):
-            key = next(iter(data))
-            df = pd.DataFrame(data[key])
+        # Handle Berlin Open Data API format: {"messages": {...}, "results": {...}, "index": [...]}
+        if isinstance(data, dict) and "index" in data and isinstance(data["index"], list):
+            df = pd.DataFrame(data["index"])
+        # Fallback: list of records
         elif isinstance(data, list):
             df = pd.DataFrame(data)
+        # Fallback: dict with a single key containing list
+        elif isinstance(data, dict):
+            key = next(iter(data))
+            if isinstance(data[key], list):
+                df = pd.DataFrame(data[key])
+            else:
+                df = pd.DataFrame([data])
         else:
             raise ValueError("Unexpected structure in ordnungsamt_2023.json")
 
@@ -134,43 +152,57 @@ class DataLoader:
         return gdf
 
     # ------------------------------------------------------------------
-    # DISTRICT DEMOGRAPHICS  (aggregated for simulation)
+    # DISTRICT DEMOGRAPHICS (12 Bezirke)
     # ------------------------------------------------------------------
     def calculate_district_demographics(self) -> pd.DataFrame:
         """
-        Aggregate population rows into 12 Berlin Bezirke.
-        Uses BEZIRK column if available, otherwise groups by first N rows.
+        Aggregate 542 LOR areas into 12 Berlin Bezirke using BEZ column.
         """
         if self.population_data is None:
             self.load_population_data()
 
         df = self.population_data.copy()
 
-        # Try to find a district-level grouping column
-        bezirk_col = None
-        for candidate in ["BEZIRK", "Bezirk", "bezirk", "BEZIRKSNAME"]:
-            if candidate in df.columns:
-                bezirk_col = candidate
-                break
+        # Berlin Bezirk names (official)
+        BEZIRK_NAMES = {
+            1:  "Mitte",
+            2:  "Friedrichshain-Kreuzberg",
+            3:  "Pankow",
+            4:  "Charlottenburg-Wilmersdorf",
+            5:  "Spandau",
+            6:  "Steglitz-Zehlendorf",
+            7:  "Tempelhof-Schöneberg",
+            8:  "Neukölln",
+            9:  "Treptow-Köpenick",
+            10: "Marzahn-Hellersdorf",
+            11: "Lichtenberg",
+            12: "Reinickendorf",
+        }
 
-        if bezirk_col:
-            demographics = (
-                df.groupby(bezirk_col)
-                .agg(
-                    total_population=("total_population", "sum"),
-                    youth_ratio=("youth_ratio", "mean"),
-                )
-                .reset_index()
-                .rename(columns={bezirk_col: "bezirk"})
-            )
-        else:
-            # Fallback: treat entire dataset as one district "Berlin"
+        # Check if BEZ column exists
+        if "BEZ" not in df.columns:
+            logger.warning("BEZ column not found, treating entire dataset as one district")
             demographics = pd.DataFrame([{
                 "bezirk": "Berlin",
                 "total_population": df["total_population"].sum(),
                 "youth_ratio": df["youth_ratio"].mean(),
             }])
+        else:
+            # Group by BEZ (Bezirk code 1-12)
+            demographics = (
+                df.groupby("BEZ")
+                .agg(
+                    total_population=("total_population", "sum"),
+                    youth_ratio=("youth_ratio", "mean"),
+                )
+                .reset_index()
+            )
+            
+            # Map BEZ codes to district names
+            demographics["bezirk"] = demographics["BEZ"].map(BEZIRK_NAMES)
+            demographics = demographics[["bezirk", "total_population", "youth_ratio"]]
 
+        # Clip youth_ratio to reasonable range
         demographics["youth_ratio"] = demographics["youth_ratio"].clip(0.15, 0.45)
 
         # Save processed
@@ -233,28 +265,26 @@ if __name__ == "__main__":
         print(f"[OK] Geographic features    : {len(geo)}")
         print(f"[OK] Districts (aggregated) : {len(demographics)}")
 
-        # --- Categories with correct attractiveness ---
+        # --- Categories ---
         print("\n" + "-" * 70)
         print("Waste Categories (app_sell_chance):")
         print("-" * 70)
         for cat in waste:
-            print(f"  {cat['category_id']:>12}  |  {cat['name']:<45}  |  attractiveness = {cat['app_sell_chance']}")
+            print(f"  {cat['category_id']:>12}  |  {cat['name']:<45}  |  {cat['app_sell_chance']}")
 
         # --- Demographics ---
         print("\n" + "-" * 70)
-        print("District Demographics:")
+        print("District Demographics (12 Bezirke):")
         print("-" * 70)
         print(demographics.to_string(index=False))
 
-        # --- Quick helper tests ---
+        # --- Youth ratio range ---
         print("\n" + "-" * 70)
-        print("Helper method tests:")
+        print("Youth Ratio Statistics:")
         print("-" * 70)
-        print(f"  get_waste_category_attractiveness('WOOD')     = {loader.get_waste_category_attractiveness('WOOD')}")
-        print(f"  get_waste_category_attractiveness('E_WASTE')  = {loader.get_waste_category_attractiveness('E_WASTE')}")
-        print(f"  get_waste_category_attractiveness('TEXTILE')  = {loader.get_waste_category_attractiveness('TEXTILE')}")
-        print(f"  get_waste_category_attractiveness('MIXED_WASTE') = {loader.get_waste_category_attractiveness('MIXED_WASTE')}")
-        print(f"  get_category_ids()                            = {loader.get_category_ids()}")
+        print(f"  Min : {demographics['youth_ratio'].min():.3f}")
+        print(f"  Max : {demographics['youth_ratio'].max():.3f}")
+        print(f"  Mean: {demographics['youth_ratio'].mean():.3f}")
 
         print("\n" + "=" * 70)
         print("ALL TESTS PASSED ✓")
