@@ -1,0 +1,5 @@
+scenario,total_items_mean,total_items_std,items_reused_mean,items_reused_std,items_collected_mean,items_collected_std,reuse_rate_mean,reuse_rate_std,total_co2_kg_mean,total_co2_kg_std
+baseline,1825.28,42.0,65.36,7.84,1735.38,41.26,0.04,0.0,4338.46,103.15
+optimistic,1824.31,35.36,352.89,21.24,1450.89,35.94,0.19,0.01,3627.23,89.86
+pessimistic,1825.18,46.53,134.69,11.81,1666.1,42.15,0.07,0.01,4165.25,105.38
+realistic,1827.84,46.0,240.5,16.23,1564.88,42.48,0.13,0.01,3912.19,106.2

@@ -85,7 +85,7 @@ def plot_scenario_comparison(df):
     
     plt.tight_layout()
     plt.savefig(output_dir / '1_scenario_comparison.png', dpi=300, bbox_inches='tight')
-    print(f"✓ Saved: 1_scenario_comparison.png")
+    print(f"[OK] Saved: 1_scenario_comparison.png")
     plt.close()
 
 # ============================================================================
@@ -98,7 +98,7 @@ def plot_district_heatmap(df):
     
     pivot = subset.pivot_table(
         index='district', 
-        columns='run', 
+        columns='run_id', 
         values='reuse_rate'
     )
     
@@ -112,7 +112,7 @@ def plot_district_heatmap(df):
     
     plt.tight_layout()
     plt.savefig(output_dir / '2_district_heatmap.png', dpi=300, bbox_inches='tight')
-    print(f"✓ Saved: 2_district_heatmap.png")
+    print(f"[OK] Saved: 2_district_heatmap.png")
     plt.close()
 
 # ============================================================================
@@ -161,7 +161,7 @@ def plot_co2_reduction(df):
     
     plt.tight_layout()
     plt.savefig(output_dir / '3_co2_reduction.png', dpi=300, bbox_inches='tight')
-    print(f"✓ Saved: 3_co2_reduction.png")
+    print(f"[OK] Saved: 3_co2_reduction.png")
     plt.close()
 
 # ============================================================================
@@ -203,7 +203,7 @@ def plot_item_flow(df):
     
     plt.tight_layout()
     plt.savefig(output_dir / '4_item_flow.png', dpi=300, bbox_inches='tight')
-    print(f"✓ Saved: 4_item_flow.png")
+    print(f"[OK] Saved: 4_item_flow.png")
     plt.close()
 
 # ============================================================================
@@ -232,7 +232,7 @@ def plot_variability(df):
     
     plt.tight_layout()
     plt.savefig(output_dir / '5_variability_boxplot.png', dpi=300, bbox_inches='tight')
-    print(f"✓ Saved: 5_variability_boxplot.png")
+    print(f"[OK] Saved: 5_variability_boxplot.png")
     plt.close()
 
 # ============================================================================
@@ -254,7 +254,7 @@ def create_summary_table(df):
     
     # Save as CSV
     agg.to_csv(output_dir / 'summary_table.csv', index=False)
-    print(f"✓ Saved: summary_table.csv")
+    print(f"[OK] Saved: summary_table.csv")
     
     return agg
 
@@ -304,7 +304,7 @@ def plot_sdg_impact(df):
     
     plt.tight_layout()
     plt.savefig(output_dir / '6_sdg_impact.png', dpi=300, bbox_inches='tight')
-    print(f"✓ Saved: 6_sdg_impact.png")
+    print(f"[OK] Saved: 6_sdg_impact.png")
     plt.close()
 
 # ============================================================================
