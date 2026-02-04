@@ -63,30 +63,200 @@ individual behavioural modelling.
 
 ## Repository Structure
 ```text
-Berlin-Smart-Waste-Sim/
+berlin-bulky-waste-simulation/
 │
 ├── data/
 │   ├── raw/                    # Original municipal datasets
-│   │   ├── ordnungsamt_2023.json
-│   │   ├── population_2024.csv
-│   │   ├── berlin_map.geojson
-│   │   └── waste_config.json
+│   │   ├── ordnungsamt_2023.json      # Illegal dumping incident reports
+│   │   ├── population_2024.csv        # Population data by LOR district
+│   │   ├── berlin_map.geojson         # Berlin LOR geospatial boundaries
+│   │   └── waste_config.json          # Waste composition and parameters
 │   │
 │   └── processed/              # Cleaned and derived datasets
 │
 ├── src/
-│   ├── __init__.py
+│   ├── __init__.py             # Package initialization
 │   ├── data_loader.py          # Data ingestion and preprocessing
 │   ├── simulation.py           # SimPy-based DES model
-│   ├── analysis.py             # Metrics calculation and visualisation
-│   └── utils.py                # Helper functions
+│   ├── analysis.py             # Metrics calculation and statistical analysis
+│   ├── visualizations.py       # Visualization generation (charts, plots)
+│   ├── choropleth.py           # Geospatial choropleth map generation
+│   └── utils.py                # Helper functions and utilities
 │
 ├── notebooks/
-│   └── 01_data_exploration.ipynb
+│   └── 01_data_exploration.ipynb   # Exploratory data analysis
 │
 ├── outputs/
 │   ├── logs/                   # Simulation run outputs (.csv)
-│   └── figures/                # Plots and charts (.png)
+│   ├── figures/                # Static plots and charts (.png)
+│   └── visualizations/         # Generated visualization outputs
 │
-├── requirements.txt
-└── README.md
+├── config/
+│   ├── logs/                   # Configuration logs
+│   └── figures/                # Configuration-related figures
+│
+├── berlin_waste_sim.egg-info/  # Package metadata (auto-generated)
+│
+├── requirements.txt            # Python dependencies
+├── setup.py                    # Package installation configuration
+└── README.md                   # Project documentation
+```
+
+---
+
+## Installation
+
+### Prerequisites
+- Python 3.9 or higher
+- pip package manager
+- Virtual environment (recommended)
+
+### Setup Instructions
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd berlin-bulky-waste-simulation
+   ```
+
+2. **Create and activate a virtual environment**
+   ```bash
+   # Windows
+   python -m venv venv
+   venv\Scripts\activate
+
+   # Linux/macOS
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
+
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Install the package in development mode** (optional)
+   ```bash
+   pip install -e .
+   ```
+
+---
+
+## Usage
+
+### Running the Simulation
+
+```python
+from src.simulation import BulkyWasteSimulation
+from src.data_loader import DataLoader
+
+# Load data
+loader = DataLoader()
+data = loader.load_all_data()
+
+# Initialize and run simulation
+sim = BulkyWasteSimulation(data)
+results = sim.run(duration=365, num_runs=100)
+```
+
+### Generating Visualizations
+
+```python
+from src.visualizations import generate_visualizations
+from src.choropleth import create_choropleth_map
+
+# Generate standard visualizations
+generate_visualizations(results)
+
+# Create geospatial choropleth maps
+create_choropleth_map(data, output_path='outputs/visualizations/')
+```
+
+### Analyzing Results
+
+```python
+from src.analysis import analyze_results
+
+# Perform statistical analysis
+analysis = analyze_results(results)
+analysis.summary()
+```
+
+---
+
+## Key Features
+
+- **Discrete Event Simulation (DES)**: SimPy-based model simulating waste item lifecycle
+- **Multi-scenario Analysis**: Compare baseline vs. app-supported reuse scenarios
+- **Geospatial Visualization**: Choropleth maps showing district-level waste patterns
+- **Statistical Analysis**: Comprehensive metrics and performance indicators
+- **Real Municipal Data**: Integration of official Berlin open data sources
+- **Reproducible Research**: Transparent data processing and parameter calibration
+
+---
+
+## Simulation Scenarios
+
+The model evaluates three primary scenarios:
+
+1. **Baseline**: Current state without digital intervention
+2. **Realistic**: Moderate app adoption with 30% waste reduction
+3. **Pessimistic**: Lower app adoption with 15% waste reduction
+
+Each scenario varies in:
+- Item arrival rates
+- Reuse probabilities
+- Collection queue dynamics
+- Municipal workload impact
+
+---
+
+## Output Files
+
+### Logs
+- `outputs/logs/simulation_results.csv` - Raw simulation event data
+- `config/logs/` - Configuration and runtime logs
+
+### Visualizations
+- `outputs/figures/` - Statistical charts and plots (PNG)
+- `outputs/visualizations/` - Generated visualization outputs
+- `config/figures/` - Configuration-related visualizations
+
+---
+
+## Technologies Used
+
+- **Simulation**: SimPy 4.1.1
+- **Data Processing**: Pandas, NumPy, GeoPandas
+- **Visualization**: Matplotlib, Seaborn, Plotly
+- **Geospatial**: Shapely, GeoJSON
+- **Statistical Analysis**: SciPy, Scikit-learn, Statsmodels
+
+---
+
+## Academic Context
+
+**Institution**: Berlin School of Business & Innovation (BSBI)  
+**Programme**: MSc Information Technology Management  
+**Module**: Digital Economy & Transformation  
+**Focus**: Simulation-based policy evaluation for urban waste management
+
+---
+
+## License
+
+This project is developed for academic purposes as part of the MSc IT Management programme.
+
+---
+
+## Contact
+
+For questions or collaboration inquiries, please contact the BSBI MSc IT Management Team.
+
+---
+
+## Acknowledgements
+
+- **Berliner Stadtreinigung (BSR)** - Waste management data
+- **Amt für Statistik Berlin-Brandenburg** - Population statistics
+- **Berlin Open Data Portal** - Geospatial and incident data
