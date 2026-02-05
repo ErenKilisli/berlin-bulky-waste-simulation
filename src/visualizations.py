@@ -72,8 +72,8 @@ def plot_scenario_comparison(df):
     
     # Right: CO2 Emissions
     bars2 = ax2.bar(scenarios, agg['total_co2_kg'], color=colors, alpha=0.8, edgecolor='black')
-    ax2.set_ylabel('Total CO₂ Emissions (kg/year/district)', fontsize=12, fontweight='bold')
-    ax2.set_title('B) CO₂ Impact by Scenario', fontsize=14, fontweight='bold')
+    ax2.set_ylabel('Total $CO_2$ Emissions (kg/year/district)', fontsize=12, fontweight='bold')
+    ax2.set_title('B) $CO_2$ Impact by Scenario', fontsize=14, fontweight='bold')
     # ax2.set_ylim(0, 5000) # Dinamik olsun diye kapattım
     ax2.grid(axis='y', alpha=0.3)
     
@@ -146,8 +146,8 @@ def plot_co2_reduction(df):
     fig, ax = plt.subplots(figsize=(10, 6))
     bars = ax.bar(valid_scenarios, reductions, color=['#ff7f0e', '#2ca02c', '#1f77b4'], 
                   alpha=0.8, edgecolor='black')
-    ax.set_ylabel('CO₂ Reduction (kg/year/district)', fontsize=12, fontweight='bold')
-    ax.set_title('CO₂ Emissions Reduction Compared to Baseline', fontsize=14, fontweight='bold')
+    ax.set_ylabel('$CO_2$ Reduction (kg/year/district)', fontsize=12, fontweight='bold')
+    ax.set_title('$CO_2$ Emissions Reduction Compared to Baseline', fontsize=14, fontweight='bold')
     ax.axhline(0, color='black', linewidth=0.8, linestyle='--')
     ax.grid(axis='y', alpha=0.3)
     
@@ -225,9 +225,9 @@ def plot_variability(df):
     
     # CO2 variability
     sns.boxplot(data=df, x='scenario', y='total_co2_kg', order=order, palette=palette, ax=ax2)
-    ax2.set_ylabel('CO₂ Emissions (kg)', fontsize=12, fontweight='bold')
+    ax2.set_ylabel('$CO_2$ Emissions (kg)', fontsize=12, fontweight='bold')
     ax2.set_xlabel('Scenario', fontsize=12)
-    ax2.set_title('B) CO₂ Emissions Variability', fontsize=13, fontweight='bold')
+    ax2.set_title('B) $CO_2$ Emissions Variability', fontsize=13, fontweight='bold')
     ax2.grid(axis='y', alpha=0.3)
     
     plt.tight_layout()
