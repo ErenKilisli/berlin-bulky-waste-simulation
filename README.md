@@ -260,3 +260,5 @@ For questions or collaboration inquiries, please contact the BSBI MSc IT Managem
 - **Berliner Stadtreinigung (BSR)** - Waste management data
 - **Amt für Statistik Berlin-Brandenburg** - Population statistics
 - **Berlin Open Data Portal** - Geospatial and incident data
+
+ALL RIGHTS RESERVED
